@@ -35,8 +35,7 @@ t1 ( void )
     if (TMR1IF) {
 	TMR1IF = 0;
 	TMR1 = TMR1_LOAD;
-	GP4 = 1;
-	NOP();
+	GP4 = 1;                                /* Generate a pulse on GP4 */
 	GP4 = 0;
     }
 }		/* -----  end of static function t1  ----- */
@@ -44,13 +43,15 @@ t1 ( void )
 void main(void) {
     OSCCON = 0xF0;				/* Internal 8Mhz system clock */
     T1CON = 0x6;                                /* Asynchronous external clock source */
-    TMR1 = TMR1_LOAD;
+    TMR1 = TMR1_LOAD;                           /* Preload Timer1 counter */
     GPIO = 0x00;
     TRISIO = ~0x10;                             /* GP4 Output */
-    ANSEL = 0x00;
+    ANSEL = 0x00;                               /* All pins digital IO */
     CMCON0 = 0x07;				/* All pins digital IO */
-    TMR1IF = 0;
-    TMR1IE = 1;
+    TMR1IF = 0;                                 /* Clear Timer1 interrupt flag */
+    TMR1IE = 1;                                 /* Timer1 interrupt enable */
+    PEIE = 1;                                   /* Peripheral interrupt enable */
+    GIE = 1;                                    /* Global interrupt enable */
     TMR1ON = 1;					/* Start Timer1 */
-    while(1);
+    while(1);                                   /* Loop 4-evva */
 }

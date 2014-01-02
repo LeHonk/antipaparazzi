@@ -2,7 +2,7 @@
 all:	main.hex
 
 install:	main.hex
-	pk2cmd -P PIC12f683 -F $< -M
+	pk2cmd -P PIC12f683 -F $< -M -R
 clean:
 	rm *.as *.cof *.d *.hex *.hxl *.lst *.p1 *.pre *.sdb *.sym startup.* funclist
 
