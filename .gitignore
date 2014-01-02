@@ -1,0 +1,15 @@
+*~
+*.swp
+*.as
+*.cof
+*.d
+*.hex
+*.hxl
+*.lst
+*.p1
+*.pre
+*.sdb
+*.sym
+startup.*
+funclist
+
