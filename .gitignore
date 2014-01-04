@@ -6,6 +6,7 @@
 *.hex
 *.hxl
 *.lst
+*.obj
 *.p1
 *.pre
 *.sdb
