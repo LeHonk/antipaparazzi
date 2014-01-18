@@ -30,13 +30,13 @@ difference() {
 	translate([0,0,10])	rotate([90,0,0]) cylinder(h=21, r=2);		// Cable channel
 	translate([0,-20,15.5]) cylinder(h=14.5, r=2);					// Cable channel between mounting
 	translate([0,0,15.5]) rotate([90,0,0]) union() {				// Laser mounting
-		cylinder(h=38,r=5.5, center=true);
-		cylinder(h=20,r=5.5);
+		cylinder(h=38,r=6, center=true);
+		cylinder(h=20,r=6);
 		cube(size=[2,10,41], center=true);
 	}
 	translate([0,0,30])	rotate([90,0,0]) union() {					// Detector mounting
-		cylinder(h=38,r=5.5, center=true);
-		cylinder(h=20,r=5.5);
+		cylinder(h=38,r=6, center=true);
+		cylinder(h=20,r=6);
 		cube(size=[2,10,41], center=true);								// Apperture
 	}
 	translate([0,0,6])	rotate([0,90,245]) cylinder(h=21, r=2);	// Set Screw hole

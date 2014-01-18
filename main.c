@@ -34,7 +34,7 @@
  *  Description:  Hadndle various interrupts
  * =====================================================================================
  */
-static void interrupt int_handler( void ) {
+void interrupt int_handler( void ) {
     if (TMR1IF) {
 	TMR1 = TMR1_LOAD;
 	GP4 = 1;                                /* Generate a pulse on GP4 */
