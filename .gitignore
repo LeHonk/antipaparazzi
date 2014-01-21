@@ -16,3 +16,5 @@ funclist
 
 scanhead.stl
 scanhead.gcode
+*.map
+*.rlf
