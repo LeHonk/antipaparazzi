@@ -6,6 +6,6 @@ install:	main.hex
 clean:
 	rm -f *.as *.cof *.d *.hex *.hxl *.lst *.p1 *.pre *.sdb *.sym *.map *.rlf startup.* funclist
 
-main.hex:	main.c
-	xc8 --CHIP=12f683 $<
+main.hex:	main.asm
+	xc8 -P --CHIP=12f683 -M$(<:.asm=.map) $<
 
