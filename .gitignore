@@ -18,3 +18,5 @@ scanhead.stl
 scanhead.gcode
 *.map
 *.rlf
+*.cod
+*.o
