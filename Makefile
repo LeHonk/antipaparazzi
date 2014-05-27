@@ -7,5 +7,5 @@ clean:
 	rm -f *.as *.cof *.d *.hex *.hxl *.lst *.p1 *.pre *.sdb *.sym *.map *.rlf startup.* funclist
 
 main.hex:	main.asm
-	xc8 -P --CHIP=12f683 -M$(<:.asm=.map) $<
+	xc8 -P --CHIP=12f683 -M$(<:.asm=.map) --RUNTIME=no_startup $<
 

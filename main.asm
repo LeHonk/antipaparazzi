@@ -15,13 +15,12 @@ OPT	TITLE		"Antipaparazzi"
 ;
 ;=====================================================================================
 
-#include <xc.inc>
+processor	12F683
 
-psect	conf, class=CONFIG, merge=1, pure
-org	0
-	dw	0x03F4			;config CPD=OFF, CP=OFF, FCMEN=ON, IESO=ON, 
-					;	BOREN=ON, MCLRE=ON, PWRTE=ON, 
-					;	FOSC=INTOSCIO
+global	start,reset_vec
+fnroot	start
+
+#include <xc.inc>
 
 TMR1_LOAD	EQU	(0xFFFF-360+1)	; Start counting on 360 less then max, 
 					; ie overflow and generate timer 
@@ -29,18 +28,47 @@ TMR1_LOAD	EQU	(0xFFFF-360+1)	; Start counting on 360 less then max,
 
 UART_DELAY	EQU	((8000000/4/9600-10)/3)	; Baud delay @ 8MHz
 
-psect	ram, class=RAM, space=1
-int_w:		ds	2		; Context save of w during interrupt
-int_status:	ds	2		; Context save of status during interrupt
-putch_c:	ds	1		; Char to transmit
-putch_cnt:	ds	1		; Bit loop counter
-delay_cnt:	ds	1		; Delay counter0
+psect	common, class=COMMON, space=1
+int_w:
+	ds	2			; Context save of w during interrupt
+int_status:
+	ds	2			; Context save of status during interrupt
+putch_c:
+	ds	1			; Char to transmit
+putch_cnt:
+	ds	1			; Bit loop counter
+delay_cnt:
+	ds	1			; Delay counter0
 
-psect	intentry, class=CODE, delta=2
+psect	config, class=CONFIG, delta=2
+		dw	0x03F4		; config CPD=OFF, CP=OFF, FCMEN=ON, IESO=ON, 
+					;	BOREN=ON, MCLRE=ON, PWRTE=ON, 
+					;	FOSC=INTOSCIO
+psect   idloc,class=IDLOC,delta=2
+psect   code,class=CODE,delta=2
+psect   powerup,class=CODE,delta=2
+psect   maintext,class=CODE,delta=2
+psect   eeprom_data,class=EEDATA,delta=2,space=2
+psect   init,class=CODE,delta=2
+psect   cinit,class=CODE,delta=2
+psect   text,class=CODE,delta=2
+psect   end_init,class=CODE,delta=2
+psect   clrtext,class=CODE,delta=2
+FSR     set     4
+psect   strings,class=CODE,delta=2,reloc=256
 
+psect   reset_vec,class=CODE,delta=2
+reset_vec:
+	goto	start
+
+psect   intentry,class=CODE,delta=2
+	org	0003h
+intentry:
 	goto	int_handler
 
-psect	text, class=CODE, merge=1, delta=2, pure
+psect   functab,class=CODE,delta=2
+
+psect   text,class=CODE,delta=2
 
 ;===  FUNCTION  ======================================================================
 ; Name:  int_handler
@@ -48,26 +76,17 @@ psect	text, class=CODE, merge=1, delta=2, pure
 ;=====================================================================================
 global	int_handler
 int_handler:
-;	BANKSEL	TMR1IF
-;	btfss	TMR1IF
-;	retfie
+	BANKSEL	GPIO
+	bsf	GP4			; Erliest possible rise of puls out
 	movwf	int_w			; Save context
 	swapf	STATUS, w
 	movwf	int_status
-	movlw	GPIO_GP4_MASK
-	xorwf	GPIO			; Toggle GP4
-;	bsf	GP4			; Erliest possible rise of puls out
-
-	movlw	high(TMR1_LOAD)		; Reload timer to overflow after 360 pulses
-	movwf	TMR1H
-	movlw	low(TMR1_LOAD)
-	movwf	TMR1L
-;	bcf	GP4			; fall of puls out, not time critical
-	bcf	TMR1IF			; Reenable Timer1 interrupt
+	bcf	CCP1IF			; Reenable Timer1 interrupt
 	swapf	int_status, w		; Restore context
 	movwf	STATUS
 	swapf	int_w, f
 	swapf	int_w, w
+	bcf	GP4			; fall of puls out, not time critical
 	retfie
 
 ;===  FUNCTION  ======================================================================
@@ -75,7 +94,7 @@ int_handler:
 ; Description:  Bitbanged uart transmit
 ; Note:         Destroys carry and W
 ;=====================================================================================
-
+global	putch
 putch:
 	banksel	0
 	movwf	putch_c
@@ -104,18 +123,12 @@ bit_delay:
 stopbit_delay:
 	decfsz	delay_cnt, f		;				(1)
 	goto	stopbit_delay		; loop to previous instruction	(3)
-	nop				;				3
-	nop				;				4
-	nop				;				5
-	nop				;				6
-	nop				;				7
-	nop				;				8
+	goto	$+1			;				4
+	goto	$+1			;				6
+	goto	$+1			;				8
 	return				;				10
 
-global	_main
-global	start_initialization
-_main:
-start_initialization:
+start:
 	BANKSEL	OSCCON
 	movlw	0x71
 	movwf	BANKMASK(OSCCON)	; Internal 8Mhz system clock
@@ -129,34 +142,44 @@ start_initialization:
 	movlw	0b00101110
 	movwf	BANKMASK(TRISIO)	; GP5 in, GP4 out, GP3 nc, GP2 in, GP1 nc, GP0 out
 	BANKSEL	T1CON
-	movlw	0b00000110
-	movwf	T1CON			; Asynchronous external clock source
-	movlw	high(TMR1_LOAD)
-	movwf	TMR1H			; Preload Timer1 counter
-	movlw	low(TMR1_LOAD)
-	movwf	TMR1L
+	movlw	0b00000010
+	movwf	T1CON			; Synchronous external clock source
+	clrf	TMR1H			; Preload Timer1 counter
+	clrf	TMR1L
 	clrf	CCP1CON			; Turn off CCP to clear prescalers
-	movlw	0x05
-	movwf	CCP1CON			; Capture mode, every rising edge
+	movlw	0x0b
+	movwf	CCP1CON			; Compare mode, clear timer1
+	movlw	low(255)		; Set up compare to generate 360 counts per revolution
+	movwf	CCPR1L
+	movlw	high(255)
+	movwf	CCPR1H
 	clrf	PIR1			; Clear all interrupt flags
-	bsf	TMR1IE			; Timer1 interrupt enable
+	bsf	CCP1IE			; CCP interrupt enable
 	bsf	PEIE			; Peripheral interrupt enable
 	bsf	GIE			; Global interrupt enable
 	bsf	TMR1ON			; Start Timer1
 
 main_loop:
-	btfss	CCP1IF			; poll CCP interrupt flag
-	goto	main_loop		; loop 4-evva
-	movf	CCPR1L, w
-;	sublw	low(TMR1_LOAD)
-;	btfsc	CARRY
-;	decf	CCPR1H, f
+;	btfss	CCP1IF
+;	goto	check_detection
+;	bsf	GP4
+;	movlw	1
+;	movwf	delay_cnt
+;	decfsz	delay_cnt, f
+;	goto	$-1
+;	bcf	CCP1IF
+;	bcf	GP4
+check_detection:
+	btfss	GP2			; poll detection sensor
+	goto	main_loop
+detect:
+	movf	TMR1L, w
 	call	putch
-	movf	CCPR1H, w
-;	sublw	high(TMR1_LOAD)
+	movf	TMR1H, w
 	call	putch
-
-	bcf	CCP1IF			; Reenable CCP "Interrupt"
+wait_clear:
+	btfsc	GP2			; Wait for detection unassertion
+	goto	wait_clear
 	goto	main_loop		; Wait 4 next detection
-
-END
+	
+	END	start
