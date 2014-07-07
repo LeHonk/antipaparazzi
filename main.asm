@@ -8,7 +8,7 @@
 ;       Version:  1.0
 ;       Created:  14-01-19 12:57
 ;      Revision:  none
-;      Compiler:  xc8
+;      Compiler:  gputils
 ;
 ;        Author:  Tomas Holmqvist (TH), tomhol@gmail.com
 ;  Organization:  
@@ -46,17 +46,19 @@ int_vec		CODE	0x04
 ; Description:  Handle various interrupts
 ;=====================================================================================
 int_handler:
-	BANKSEL	GPIO
-	bsf	GPIO, GP4		; Erliest possible rise of puls out
-	movwf	int_w			; Save context
-	swapf	STATUS, w
-	movwf	int_status
+;	BANKSEL	GPIO
+	bsf	GPIO, GP0		; Erliest possible rise of puls out
+;	movwf	int_w			; Save context
+;	swapf	STATUS, w
+;	movwf	int_status
+;	clrf	TMR1H
+;	clrf	TMR1L
 	bcf	PIR1, CCP1IF		; Reenable Timer1 interrupt
-	swapf	int_status, w		; Restore context
-	movwf	STATUS
-	swapf	int_w, f
-	swapf	int_w, w
-	bcf	GPIO, GP4		; fall of puls out, not time critical
+;	swapf	int_status, w		; Restore context
+;	movwf	STATUS
+;	swapf	int_w, f
+;	swapf	int_w, w
+	bcf	GPIO, GP0		; fall of puls out, not time critical
 	retfie
 
 ;===  FUNCTION  ======================================================================
@@ -103,8 +105,8 @@ start:
 	movlw	71h
 	movwf	OSCCON			; Internal 8Mhz system clock
 	BANKSEL	GPIO
-	movlw	B'00000001'		; GP0 High
-	movwf	GPIO			; Clear all pins,  except GP0
+	movlw	B'00010001'		; GP0 (TxD), GP4 (Comp_In) High
+	movwf	GPIO			; Clear all pins, except GP0 & GP4
 	movlw	B'00000111'
 	movwf	CMCON0			; No comparator used
 	BANKSEL	ANSEL
@@ -112,41 +114,47 @@ start:
 	movlw	B'00101110'
 	movwf	TRISIO			; GP5 in, GP4 out, GP3 nc, GP2 in, GP1 nc, GP0 out
 	BANKSEL	T1CON
-	movlw	B'00000010'
+	movlw	B'00000011'
 	movwf	T1CON			; Synchronous external clock source
 	clrf	TMR1H			; Preload Timer1 counter
 	clrf	TMR1L
 	clrf	CCP1CON			; Turn off CCP to clear prescalers
-	movlw	0x0B
+	movlw	B'00001011'
 	movwf	CCP1CON			; Compare mode, clear timer1
-	movlw	low(255)		; Set up compare to generate 360 counts per revolution
+	movlw	low(360)		; Set up compare to generate 360 counts per revolution
 	movwf	CCPR1L
-	movlw	high(255)
+	movlw	high(360)
 	movwf	CCPR1H
 	clrf	PIR1			; Clear all interrupt flags
+	clrf	INTCON
 	bsf	PIE1, CCP1IE		; CCP interrupt enable
 	bsf	INTCON, PEIE		; Peripheral interrupt enable
 	bsf	INTCON, GIE		; Global interrupt enable
 	bsf	T1CON, TMR1ON		; Start Timer1
 
 main_loop:
-;	btfss	CCP1IF
-;	goto	check_detection
-;	bsf	GP4
-;	movlw	1
-;	movwf	delay_cnt
-;	decfsz	delay_cnt, f
-;	goto	$-1
-;	bcf	CCP1IF
-;	bcf	GP4
+
+check_clk:
+	btfss	GPIO, GP5
+	goto	check_clk_done
+	incfsz	putch_c, f		; Divide by 256
+	goto	wait_clk_clear
+	bsf	GPIO, GP4
+wait_clk_clear:
+	btfsc	GPIO, GP5
+	goto	wait_clk_clear
+	bcf	GPIO, GP4
+check_clk_done:
+	goto	main_loop
+
 check_detection:
 	btfss	GPIO, GP2		; poll detection sensor
 	goto	main_loop
 detect:
 	movf	TMR1L, w
-	call	putch
+;	call	putch
 	movf	TMR1H, w
-	call	putch
+;	call	putch
 wait_clear:
 	btfsc	GPIO, GP2		; Wait for detection unassertion
 	goto	wait_clear
