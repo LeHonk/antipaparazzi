@@ -15,6 +15,9 @@
 ;
 ;=====================================================================================
 
+; TODO
+;	* Use watchdog to enable laser
+
 	PROCESSOR	12F683
 
 	INCLUDE		"p12f683.inc"
@@ -23,7 +26,7 @@ TMR1_LOAD	EQU	(0xFFFF-360+1)	; Start counting on 360 less then max,
 					; ie overflow and generate timer 
 					; interrupt after 360 counts
 
-UART_DELAY	EQU	66		; Baud delay @ 8MHz ((8000000/4/9600-10)/3)
+UART_DELAY	EQU	45		; Baud delay @ 8MHz ((8000000/4/9600-10)/3)=66
 
 	UDATA_SHR
 int_w		RES	1 		; Context save of w during interrupt
@@ -32,33 +35,21 @@ putch_c		RES	1		; Char to transmit
 putch_cnt	RES	1		; Bit loop counter
 delay_cnt	RES	1		; Delay counter0
 
-	__CONFIG _CPD_OFF & _CP_OFF & _FCMEN_ON & _IESO_ON & _BOD_ON & _MCLRE_ON & _PWRTE_ON & _INTOSCIO
+	__CONFIG _FCMEN_ON & _IESO_ON & _BOD_ON & _CPD_OFF & _CP_OFF & _MCLRE_ON & _PWRTE_ON & _WDT_OFF & _INTOSCIO
 
 reset_vec	CODE	0x00
 	goto	start
 
-int_vec		CODE	0x04
-	goto	int_handler
-
-		CODE
 ;===  FUNCTION  ======================================================================
 ; Name:  int_handler
 ; Description:  Handle various interrupts
 ;=====================================================================================
+int_vec		CODE	0x04
 int_handler:
-;	BANKSEL	GPIO
-	bsf	GPIO, GP0		; Erliest possible rise of puls out
-;	movwf	int_w			; Save context
-;	swapf	STATUS, w
-;	movwf	int_status
-;	clrf	TMR1H
-;	clrf	TMR1L
+	bsf	GPIO, GP4		; Erliest possible rise of puls out
 	bcf	PIR1, CCP1IF		; Reenable Timer1 interrupt
-;	swapf	int_status, w		; Restore context
-;	movwf	STATUS
-;	swapf	int_w, f
-;	swapf	int_w, w
-	bcf	GPIO, GP0		; fall of puls out, not time critical
+	clrwdt				; Clear watchdog timer
+	bcf	GPIO, GP4		; fall of puls out, not time critical
 	retfie
 
 ;===  FUNCTION  ======================================================================
@@ -68,7 +59,6 @@ int_handler:
 ;=====================================================================================
 	GLOBAL	putch
 putch:
-	banksel	0
 	movwf	putch_c
 	movlw	9			; 1 start bit + 8 bit + 1 stop bit
 	movwf	putch_cnt
@@ -121,40 +111,30 @@ start:
 	clrf	CCP1CON			; Turn off CCP to clear prescalers
 	movlw	B'00001011'
 	movwf	CCP1CON			; Compare mode, clear timer1
-	movlw	low(360)		; Set up compare to generate 360 counts per revolution
+	movlw	low(D'360')		; Set up compare to generate 360 counts per revolution
 	movwf	CCPR1L
-	movlw	high(360)
+	movlw	high(D'360')
 	movwf	CCPR1H
+	movlw	B''
 	clrf	PIR1			; Clear all interrupt flags
 	clrf	INTCON
+	BANKSEL	PIE1
 	bsf	PIE1, CCP1IE		; CCP interrupt enable
 	bsf	INTCON, PEIE		; Peripheral interrupt enable
 	bsf	INTCON, GIE		; Global interrupt enable
+	BANKSEL	T1CON
 	bsf	T1CON, TMR1ON		; Start Timer1
 
 main_loop:
 
-check_clk:
-	btfss	GPIO, GP5
-	goto	check_clk_done
-	incfsz	putch_c, f		; Divide by 256
-	goto	wait_clk_clear
-	bsf	GPIO, GP4
-wait_clk_clear:
-	btfsc	GPIO, GP5
-	goto	wait_clk_clear
-	bcf	GPIO, GP4
-check_clk_done:
-	goto	main_loop
-
 check_detection:
 	btfss	GPIO, GP2		; poll detection sensor
-	goto	main_loop
+	goto	main_loop		; Wait 4 next detection
 detect:
 	movf	TMR1L, w
-;	call	putch
+	call	putch
 	movf	TMR1H, w
-;	call	putch
+	call	putch
 wait_clear:
 	btfsc	GPIO, GP2		; Wait for detection unassertion
 	goto	wait_clear
