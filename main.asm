@@ -17,6 +17,8 @@
 
 ; TODO
 ;	* Use watchdog to enable laser
+;	* Wrap-safe timer read
+;	* Better detection
 
 	PROCESSOR	12F683
 
@@ -115,10 +117,10 @@ start:
 	movwf	CCPR1L
 	movlw	high(D'360')
 	movwf	CCPR1H
-	movlw	B''
 	clrf	PIR1			; Clear all interrupt flags
 	clrf	INTCON
 	BANKSEL	PIE1
+	bsf	IOC, IOC2		; Let detection pin trigger IOC flag => pulse elongation
 	bsf	PIE1, CCP1IE		; CCP interrupt enable
 	bsf	INTCON, PEIE		; Peripheral interrupt enable
 	bsf	INTCON, GIE		; Global interrupt enable
@@ -128,7 +130,7 @@ start:
 main_loop:
 
 check_detection:
-	btfss	GPIO, GP2		; poll detection sensor
+	btfss	INTCON, GPIF		; poll detection sensor
 	goto	main_loop		; Wait 4 next detection
 detect:
 	movf	TMR1L, w
@@ -138,6 +140,7 @@ detect:
 wait_clear:
 	btfsc	GPIO, GP2		; Wait for detection unassertion
 	goto	wait_clear
+	bcf	INTCON, GPIF		; Clear iterrupt flag
 	goto	main_loop		; Wait 4 next detection
 	
 	END
