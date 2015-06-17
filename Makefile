@@ -1,3 +1,4 @@
+include $(wildcard *.deps)
 
 all:	main.hex
 
@@ -13,3 +14,5 @@ clean:
 %.hex:		%.o
 	gplink -m -o $@ $<
 
+%.stl:		%.scad
+	openscad -m make -o $@ -d $@.deps $<

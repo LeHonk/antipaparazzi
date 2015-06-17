@@ -13,9 +13,7 @@
 *.sym
 startup.*
 funclist
-
-scanhead.stl
-scanhead.gcode
+*.deps
 *.map
 *.rlf
 *.cod
